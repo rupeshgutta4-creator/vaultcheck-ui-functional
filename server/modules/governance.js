@@ -447,6 +447,79 @@ class GovernanceService {
         return { title: 'governance', purpose: 'governance production service operations', healthy: health.healthy, recordCount: health.records, version: health.version };
   }
 
+  calculatePSI(baselineCounts = [], targetCounts = [], epsilon = 1e-4) {
+    if (!Array.isArray(baselineCounts) || !Array.isArray(targetCounts) || baselineCounts.length !== targetCounts.length || baselineCounts.length === 0) {
+      throw new Error('Baseline and target distributions must be non-empty arrays of identical length');
+    }
+
+    const sumBaseline = baselineCounts.reduce((a, b) => a + Number(b || 0), 0);
+    const sumTarget = targetCounts.reduce((a, b) => a + Number(b || 0), 0);
+
+    if (sumBaseline === 0 || sumTarget === 0) {
+      throw new Error('Total distribution counts must be greater than zero');
+    }
+
+    let totalPsi = 0;
+    const binDetails = [];
+
+    for (let i = 0; i < baselineCounts.length; i++) {
+      const bPct = Math.max(epsilon, Number(baselineCounts[i] || 0) / sumBaseline);
+      const tPct = Math.max(epsilon, Number(targetCounts[i] || 0) / sumTarget);
+
+      const diff = tPct - bPct;
+      const lnRatio = Math.log(tPct / bPct);
+      const binPsi = diff * lnRatio;
+
+      totalPsi += binPsi;
+      binDetails.push({
+        binIndex: i,
+        baselinePct: Number(bPct.toFixed(4)),
+        targetPct: Number(tPct.toFixed(4)),
+        binPsi: Number(binPsi.toFixed(6))
+      });
+    }
+
+    const psi = Number(Math.max(0, totalPsi).toFixed(4));
+    const driftLevel = psi >= 0.20 ? 'SIGNIFICANT' : psi >= 0.10 ? 'MODERATE' : 'NONE';
+
+    return {
+      psi,
+      driftLevel,
+      requiresAction: psi >= 0.10,
+      binCount: baselineCounts.length,
+      binDetails
+    };
+  }
+
+  recordDistribution(windowId, metricName, bins = []) {
+    const entry = {
+      id: `gov-dist-${windowId}-${metricName}`,
+      windowId: String(windowId),
+      metricName: String(metricName),
+      bins: Array.from(bins).map(Number),
+      recordedAt: new Date().toISOString()
+    };
+    return this.create(entry);
+  }
+
+  evaluateStreamDrift(baselineWindowId, streamingWindowId, metricName) {
+    const baseline = this.records.get(`gov-dist-${baselineWindowId}-${metricName}`);
+    const streaming = this.records.get(`gov-dist-${streamingWindowId}-${metricName}`);
+
+    if (!baseline || !streaming) {
+      return { evaluated: false, error: 'One or both distribution windows not found' };
+    }
+
+    const psiResult = this.calculatePSI(baseline.bins, streaming.bins);
+    return {
+      evaluated: true,
+      baselineWindowId,
+      streamingWindowId,
+      metricName,
+      ...psiResult
+    };
+  }
+
 }
 
 module.exports = { GovernanceService,
