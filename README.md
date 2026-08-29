@@ -72,3 +72,6 @@ vaultcheck/
 ## License
 
 Proprietary. Not open source. Do not distribute without permission.
+
+## Changelog
+- Initial release of VaultCheck password analyzer
