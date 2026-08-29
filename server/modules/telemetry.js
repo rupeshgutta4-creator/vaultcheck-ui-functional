@@ -447,6 +447,43 @@ class TelemetryService {
         return { title: 'telemetry', purpose: 'telemetry production service operations', healthy: health.healthy, recordCount: health.records, version: health.version };
   }
 
+  recordTrace(trace = {}) {
+    if (!trace || typeof trace !== 'object') return null;
+    const entry = {
+      id: `trace-${Date.now()}-${stableKey(trace).slice(0, 6)}`,
+      correlationId: String(trace.correlationId || ''),
+      requestId: String(trace.requestId || ''),
+      method: String(trace.method || 'GET').toUpperCase(),
+      path: String(trace.path || '/'),
+      statusCode: Number(trace.statusCode || 200),
+      durationMs: Number(trace.durationMs || 0),
+      timestamp: new Date().toISOString()
+    };
+    return this.create(entry);
+  }
+
+  correlate(correlationId) {
+    if (!correlationId) return [];
+    return this.findByKey({ key: 'correlationId', value: String(correlationId) });
+  }
+
+  getTraceMetrics() {
+    const traces = Array.from(this.records.values()).filter(r => r.id && r.id.startsWith('trace-'));
+    if (!traces.length) {
+      return { total: 0, errorCount: 0, errorRate: 0, avgDurationMs: 0, p95DurationMs: 0 };
+    }
+    const durations = traces.map(t => Number(t.durationMs) || 0).sort((a, b) => a - b);
+    const errors = traces.filter(t => t.statusCode >= 400).length;
+    const p95Index = Math.floor(durations.length * 0.95);
+    return {
+      total: traces.length,
+      errorCount: errors,
+      errorRate: Number((errors / traces.length).toFixed(4)),
+      avgDurationMs: Number(average(durations).toFixed(2)),
+      p95DurationMs: Number((durations[p95Index] || durations[durations.length - 1]).toFixed(2))
+    };
+  }
+
 }
 
 module.exports = { TelemetryService,
