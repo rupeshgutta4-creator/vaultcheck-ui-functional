@@ -31,3 +31,4 @@ describe('VaultCheck basics', () => {
     expect(fs.existsSync(dataPath)).toBe(true);
   });
 });
+// Additional test placeholder for coverage
