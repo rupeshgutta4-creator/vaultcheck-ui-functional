@@ -1,0 +1,33 @@
+{
+  "name": "vaultcheck",
+  "version": "1.0.0",
+  "description": "Client-side password strength analyzer + k-anonymity breach checker. No database. Proprietary.",
+  "main": "server/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node server/index.js",
+    "test": "jest --coverage",
+    "test:watch": "jest --watch"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "collectCoverageFrom": [
+      "server/**/*.js",
+      "public/app.js"
+    ],
+    "coverageDirectory": "coverage",
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ]
+  }
+}
