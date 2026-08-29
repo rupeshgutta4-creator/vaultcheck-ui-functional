@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>VaultCheck — Password Strength, Policy &amp; Breach Lookup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="brand-mark">◈</span> VaultCheck</div>
+  <div class="topbar-note">Nothing you type ever leaves this tab. Breach checks run against a bundled 99,838‑hash offline dataset first — no network required.</div>
+</header>
+
+<main>
+  <section class="intake">
+    <div class="dial-wrap">
+      <div class="dial" id="dial">
+        <div class="pin pin-lower" data-pin="lower"><span>a-z</span></div>
+        <div class="pin pin-upper" data-pin="upper"><span>A-Z</span></div>
+        <div class="pin pin-digit" data-pin="digit"><span>0-9</span></div>
+        <div class="pin pin-symbol" data-pin="symbol"><span>#$%</span></div>
+        <div class="dial-face">
+          <div class="dial-ring" id="dialRing"></div>
+          <div class="dial-center">
+            <label for="pw" class="sr-only">Password</label>
+            <input id="pw" type="password" autocomplete="off" spellcheck="false" placeholder="Type a password" />
+            <button id="toggleVis" type="button" title="Show/hide">◉</button>
+          </div>
+        </div>
+      </div>
+      <p class="verdict" id="verdict">Enter a password to begin the read‑out</p>
+      <p class="crackTime" id="crackTime"></p>
+      <p class="policyLine" id="policyLine"></p>
+    </div>
+
+    <div class="ledger">
+      <div class="ledger-row">
+        <span class="ledger-label">ENTROPY READOUT</span>
+        <span class="ledger-value" id="entropyBits">— bits</span>
+      </div>
+      <div class="byte-grid" id="byteGrid" aria-hidden="true"></div>
+
+      <div class="ledger-row">
+        <span class="ledger-label">PATTERN SCAN</span>
+      </div>
+      <ul class="findings" id="findings">
+        <li class="empty">No password entered yet.</li>
+      </ul>
+
+      <div class="ledger-row breach-row">
+        <span class="ledger-label">BREACH MANIFEST</span>
+        <span class="breach-status" id="breachStatus">idle</span>
+      </div>
+      <p class="breach-detail" id="breachDetail">Checked locally against a bundled offline dataset of 99,838 breach-hashes. An optional live lookup against the HaveIBeenPwned range API supplements this when reachable.</p>
+      <div class="breach-progress" id="breachProgress" hidden><i id="breachProgressBar"></i></div>
+    </div>
+  </section>
+
+  <section class="panels">
+    <div class="panel-card">
+      <div class="panel-head">
+        <p class="eyebrow">POLICY PARAMETERS</p>
+        <h2>Tune every threshold</h2>
+        <button id="resetParams" class="ghost small">Reset defaults</button>
+      </div>
+      <div class="params-grid">
+        <label class="param">
+          <span>Minimum length</span>
+          <input type="number" id="pMinLength" min="4" max="64" value="12">
+        </label>
+        <label class="param">
+          <span>Attacker guesses / second</span>
+          <select id="pGuessRate">
+            <option value="1000">1,000 — throttled online login</option>
+            <option value="1000000">1,000,000 — moderate offline (salted)</option>
+            <option value="10000000000" selected>10,000,000,000 — fast offline GPU rig</option>
+            <option value="1000000000000">1,000,000,000,000 — specialised hardware (unsalted)</option>
+          </select>
+        </label>
+        <label class="param checkbox">
+          <input type="checkbox" id="pReqLower" checked><span>Require lowercase</span>
+        </label>
+        <label class="param checkbox">
+          <input type="checkbox" id="pReqUpper" checked><span>Require uppercase</span>
+        </label>
+        <label class="param checkbox">
+          <input type="checkbox" id="pReqDigit" checked><span>Require a digit</span>
+        </label>
+        <label class="param checkbox">
+          <input type="checkbox" id="pReqSymbol"><span>Require a symbol</span>
+        </label>
+        <label class="param checkbox">
+          <input type="checkbox" id="pBlockKeyboard" checked><span>Flag keyboard walks</span>
+        </label>
+        <label class="param checkbox">
+          <input type="checkbox" id="pBlockSequential" checked><span>Flag sequential runs</span>
+        </label>
+        <label class="param checkbox">
+          <input type="checkbox" id="pBlockRepeats" checked><span>Flag repeated characters</span>
+        </label>
+        <label class="param checkbox">
+          <input type="checkbox" id="pBlockYear" checked><span>Flag embedded years</span>
+        </label>
+        <label class="param wide">
+          <span>Custom banned terms (comma-separated — e.g. your company or name)</span>
+          <input type="text" id="pBanned" placeholder="acme, johnsmith, speedmath">
+        </label>
+        <label class="param wide checkbox">
+          <input type="checkbox" id="pUseOnline"><span>Also try live HaveIBeenPwned lookup when the offline dataset finds no match</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="panel-card">
+      <div class="panel-head">
+        <p class="eyebrow">GENERATOR</p>
+        <h2>Produce a compliant secret</h2>
+      </div>
+      <div class="params-grid">
+        <label class="param">
+          <span>Length</span>
+          <input type="number" id="gLength" min="6" max="128" value="20">
+        </label>
+        <label class="param">
+          <span>Mode</span>
+          <select id="gMode">
+            <option value="random" selected>Random characters</option>
+            <option value="passphrase">Passphrase (word-based)</option>
+          </select>
+        </label>
+        <label class="param checkbox"><input type="checkbox" id="gLower" checked><span>Lowercase</span></label>
+        <label class="param checkbox"><input type="checkbox" id="gUpper" checked><span>Uppercase</span></label>
+        <label class="param checkbox"><input type="checkbox" id="gDigit" checked><span>Digits</span></label>
+        <label class="param checkbox"><input type="checkbox" id="gSymbol" checked><span>Symbols</span></label>
+        <label class="param checkbox"><input type="checkbox" id="gAmbiguous"><span>Exclude ambiguous (l 1 I O 0)</span></label>
+        <label class="param" id="gWordCountWrap" hidden>
+          <span>Word count</span>
+          <input type="number" id="gWordCount" min="3" max="10" value="5">
+        </label>
+      </div>
+      <div class="generated-row">
+        <input id="gOutput" class="mono-out" readonly placeholder="Click Generate…" />
+        <button id="gCopy" class="ghost">Copy</button>
+        <button id="gGenerate" class="primary">Generate</button>
+      </div>
+      <p class="gen-note">Uses <code>crypto.getRandomValues</code> — cryptographically secure randomness, generated locally.</p>
+    </div>
+  </section>
+
+  <section class="method">
+    <h2>How this works</h2>
+    <div class="method-grid">
+      <article>
+        <span class="num">Strength</span>
+        <p>Computed locally from character-class diversity, length, and a scan for common patterns — all thresholds above are live parameters, not hardcoded. Nothing is transmitted for this part.</p>
+      </article>
+      <article>
+        <span class="num">Offline breach check</span>
+        <p>Your password is hashed with SHA‑1 in your browser and checked against a bundled dataset of 99,838 hashes from the UK NCSC's top breached-password list (via SecLists, MIT licensed). This works with zero network access.</p>
+      </article>
+      <article>
+        <span class="num">Optional live check</span>
+        <p>If enabled, a 5‑character hash prefix (never the full password) is sent to your own server, which relays it to the HaveIBeenPwned range API for broader coverage — supplementing, not replacing, the offline check.</p>
+      </article>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p>VaultCheck — a client-side security utility. Offline dataset: NCSC top 100k passwords via SecLists (MIT). Not affiliated with Have I Been Pwned.</p>
+</footer>
+
+<script src="/app.js"></script>
+</body>
+</html>
