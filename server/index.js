@@ -1,17 +1,20 @@
-// VaultCheck server — static file server only.
+// VaultCheck server — static file server + thin HIBP k-anonymity proxy.
 // No database, no sessions, no password ever touches this process.
 // Password strength scoring and the HaveIBeenPwned breach lookup both
-// happen entirely in the browser (see public/app.js).
+// happen primarily in the browser (see public/app.js).
+'use strict';
+
 const express = require('express');
 const path = require('path');
+const { fetchRange } = require('./lib/hibp-proxy');
+const log = require('./lib/logger');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.disable('x-powered-by');
 
-// The offline breach dataset (99,838 SHA-1 hashes, ~4MB) never changes at
-// runtime, so let browsers cache it hard after the first load.
+// The offline breach dataset never changes at runtime.
 app.use('/data/offline-breach-hashes.txt', express.static(
   path.join(__dirname, '..', 'public', 'data', 'offline-breach-hashes.txt'),
   { maxAge: '30d', immutable: true }
@@ -26,27 +29,25 @@ app.get('/api/health', (_req, res) => {
 // Thin proxy for the HaveIBeenPwned k-anonymity range lookup.
 // Only ever receives a 5-char hash PREFIX from the browser — never a
 // password or a full hash — and just relays HIBP's response back.
-// This exists purely to avoid any browser CORS/file:// edge cases;
-// no data is stored or logged here.
-app.get('/api/breach/:prefix', async (req, res) => {
-  const prefix = String(req.params.prefix || '').toUpperCase();
-  if (!/^[0-9A-F]{5}$/.test(prefix)) {
-    return res.status(400).json({ error: 'Invalid prefix' });
+app.get('/api/hibp/range/:prefix', async (req, res) => {
+  const prefix = (req.params.prefix || '').trim();
+  if (!/^[0-9A-Fa-f]{5}$/.test(prefix)) {
+    return res.status(400).json({ error: 'prefix must be exactly 5 hex characters' });
   }
   try {
-    const upstream = await fetch(`https://api.pwnedpasswords.com/range/${prefix}`, {
-      headers: { 'User-Agent': 'VaultCheck-DemoApp' },
-    });
-    if (!upstream.ok) {
-      return res.status(upstream.status).json({ error: `Upstream returned ${upstream.status}` });
-    }
-    const text = await upstream.text();
-    res.type('text/plain').send(text);
+    const body = await fetchRange(prefix);
+    res.type('text/plain').send(body);
   } catch (err) {
-    res.status(502).json({ error: 'Could not reach breach API' });
+    log.warn('HIBP proxy failure', { message: err.message });
+    res.status(502).json({ error: 'upstream unavailable' });
   }
 });
 
+app.use((err, _req, res, _next) => {
+  log.error('Unhandled error', { message: err.message });
+  res.status(500).json({ error: 'internal' });
+});
+
 app.listen(PORT, () => {
-  console.log(`VaultCheck running at http://localhost:${PORT}`);
+  log.info('VaultCheck listening', { port: PORT });
 });
