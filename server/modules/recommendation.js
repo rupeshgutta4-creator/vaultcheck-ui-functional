@@ -447,6 +447,108 @@ class RecommendationService {
         return { title: 'recommendation', purpose: 'recommendation production service operations', healthy: health.healthy, recordCount: health.records, version: health.version };
   }
 
+  generateCapsules(assessment = {}) {
+    const entropy = Number(assessment.entropy || 0);
+    const findings = Array.isArray(assessment.findings) ? assessment.findings : [];
+    const breachFound = Boolean(assessment.breachFound || assessment.breached);
+    const policyFailures = Array.isArray(assessment.policyFailures) ? assessment.policyFailures : [];
+
+    const capsules = [];
+
+    // 1. Entropy Capsule
+    if (entropy < 60) {
+      const actions = [];
+      if (entropy < 35) {
+        actions.push({ action: 'Increase length by at least 4 characters', rationale: 'Significantly expands search space against brute-force attacks', effort: 'LOW', impact: 'HIGH' });
+      }
+      if (assessment.missingCharSets && assessment.missingCharSets.length) {
+        actions.push({ action: `Incorporate missing character sets (${assessment.missingCharSets.join(', ')})`, rationale: 'Diversifies alphabet pool from 26 to up to 95 symbols', effort: 'LOW', impact: 'MEDIUM' });
+      }
+      capsules.push({
+        interest: 'entropy_enhancement',
+        weight: entropy < 35 ? 90 : 50,
+        summary: 'Strengthen raw mathematical unpredictability',
+        actions
+      });
+    }
+
+    // 2. Breach Mitigation Capsule
+    if (breachFound) {
+      capsules.push({
+        interest: 'breach_mitigation',
+        weight: 100,
+        summary: 'Eliminate known exposed credentials from public breaches',
+        actions: [
+          { action: 'Completely replace password with an uncompromised secret', rationale: 'Password has appeared in public breach corpuses and is vulnerable to dictionary attacks', effort: 'LOW', impact: 'CRITICAL' },
+          { action: 'Enable multi-factor authentication (MFA)', rationale: 'Guards against credential stuffing if password was ever reused', effort: 'MEDIUM', impact: 'HIGH' }
+        ]
+      });
+    }
+
+    // 3. Pattern Disruption Capsule
+    const patternFindings = findings.filter(f => /walk|repeat|ring|sequence|dictionary/i.test(typeof f === 'string' ? f : f.type || ''));
+    if (patternFindings.length > 0) {
+      const actions = patternFindings.map(p => ({
+        action: `Eliminate predictable pattern: ${typeof p === 'string' ? p : p.description || p.type}`,
+        rationale: 'Attack tools prioritize topological keyboard paths and repeating sequences',
+        effort: 'LOW',
+        impact: 'HIGH'
+      }));
+      capsules.push({
+        interest: 'pattern_disruption',
+        weight: 75,
+        summary: 'Break predictable spatial and algorithmic patterns',
+        actions
+      });
+    }
+
+    // 4. Policy Compliance Capsule
+    if (policyFailures.length > 0) {
+      capsules.push({
+        interest: 'policy_compliance',
+        weight: 85,
+        summary: 'Satisfy organizational password policy controls',
+        actions: policyFailures.map(rule => ({
+          action: `Satisfy requirement: ${rule}`,
+          rationale: 'Mandatory organizational governance requirement',
+          effort: 'LOW',
+          impact: 'HIGH'
+        }))
+      });
+    }
+
+    // Sort capsules by weight descending
+    capsules.sort((a, b) => b.weight - a.weight);
+
+    return {
+      capsuleCount: capsules.length,
+      capsules,
+      overallHealth: capsules.length === 0 ? 'STRONG' : capsules[0].weight >= 90 ? 'CRITICAL' : 'NEEDS_IMPROVEMENT'
+    };
+  }
+
+  getPrioritizedActions(assessment = {}) {
+    const { capsules } = this.generateCapsules(assessment);
+    const effortScores = { LOW: 1, MEDIUM: 2, HIGH: 3 };
+    const impactScores = { CRITICAL: 5, HIGH: 4, MEDIUM: 2, LOW: 1 };
+
+    const flattened = [];
+    for (const capsule of capsules) {
+      for (const item of capsule.actions) {
+        const impactVal = impactScores[item.impact] || 2;
+        const effortVal = effortScores[item.effort] || 2;
+        const score = Number((impactVal / effortVal).toFixed(2));
+        flattened.push({
+          ...item,
+          interest: capsule.interest,
+          priorityScore: score
+        });
+      }
+    }
+
+    return flattened.sort((a, b) => b.priorityScore - a.priorityScore);
+  }
+
 }
 
 module.exports = { RecommendationService,
