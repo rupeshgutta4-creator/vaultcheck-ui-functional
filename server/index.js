@@ -9,11 +9,15 @@ const path = require('path');
 const { fetchRange } = require('./lib/hibp-proxy');
 const log = require('./lib/logger');
 const serviceApi = require('./api/services');
+const { createService } = require('./service-registry');
+const { createCorrelationMiddleware } = require('./lib/correlation');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const telemetry = createService('telemetry');
 
 app.disable('x-powered-by');
+app.use(createCorrelationMiddleware(telemetry));
 
 // The offline breach dataset never changes at runtime.
 app.use('/data/offline-breach-hashes.txt', express.static(
