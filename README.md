@@ -75,3 +75,17 @@ Proprietary. Not open source. Do not distribute without permission.
 
 ## Changelog
 - Initial release of VaultCheck password analyzer
+
+## Docker
+
+```bash
+docker build -t vaultcheck .
+docker run -p 3000:3000 vaultcheck
+```
+
+Or use the npm helpers:
+
+```bash
+npm run docker:build
+npm run docker:run
+```
