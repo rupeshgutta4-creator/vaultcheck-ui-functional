@@ -447,6 +447,41 @@ class RiskService {
         return { title: 'risk', purpose: 'risk production service operations', healthy: health.healthy, recordCount: health.records, version: health.version };
   }
 
+  evaluateRingRisk(patternAnalysis = {}) {
+    let riskScore = 0;
+    const factors = [];
+
+    if (patternAnalysis.detected && Array.isArray(patternAnalysis.rings)) {
+      for (const ring of patternAnalysis.rings) {
+        const factorWeight = ring.length >= 8 ? 35 : ring.length >= 6 ? 25 : 15;
+        riskScore += factorWeight;
+        factors.push({
+          type: 'ring_pattern',
+          ringType: ring.ringType,
+          length: ring.length,
+          severity: factorWeight >= 30 ? 'CRITICAL' : 'HIGH'
+        });
+      }
+    }
+
+    if (patternAnalysis.cyclomaticScore && patternAnalysis.cyclomaticScore > 3) {
+      riskScore += 15;
+      factors.push({
+        type: 'topology_cyclomatic_repetition',
+        cyclomaticScore: patternAnalysis.cyclomaticScore,
+        severity: 'MEDIUM'
+      });
+    }
+
+    const boundedRisk = clamp(riskScore, 0, 100);
+    return {
+      riskScore: boundedRisk,
+      riskLevel: boundedRisk >= 60 ? 'HIGH' : boundedRisk >= 30 ? 'ELEVATED' : 'LOW',
+      factors,
+      requiresRemediation: boundedRisk >= 30
+    };
+  }
+
 }
 
 module.exports = { RiskService,
