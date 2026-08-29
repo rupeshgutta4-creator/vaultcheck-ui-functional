@@ -1,7 +1,7 @@
 {
   "name": "vaultcheck",
-  "version": "1.0.0",
-  "description": "Client-side password strength analyzer + k-anonymity breach checker. No database. Proprietary.",
+  "version": "2.0.0",
+  "description": "VaultCheck production password security analysis platform with modular privacy-first services and k-anonymity breach checking. Proprietary.",
   "main": "server/index.js",
   "type": "commonjs",
   "scripts": {
@@ -9,9 +9,11 @@
     "dev": "node server/index.js",
     "test": "jest --coverage",
     "test:watch": "jest --watch",
-    "build": "echo \"No build step required — static + Node server\"",
+    "build": "echo \"No build step required \u2014 static + Node server\"",
     "docker:build": "docker build -t vaultcheck .",
-    "docker:run": "docker run -p 3000:3000 vaultcheck"
+    "docker:run": "docker run -p 3000:3000 vaultcheck",
+    "validate": "node -e \"const r=require('./server/service-registry'); console.log(r.listServices().length+' services registered')\"",
+    "smoke": "node -e \"const r=require('./server/service-registry'); if(!r.listServices().length) process.exit(1); console.log('VaultCheck smoke test passed')\""
   },
   "engines": {
     "node": ">=18.0.0"

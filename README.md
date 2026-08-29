@@ -1,16 +1,26 @@
 # VaultCheck
 
-Client-side password strength analyzer and k-anonymity breach checker.  
-No database. Passwords never leave the browser.
+VaultCheck is a privacy-first password security analysis platform. Passwords are analyzed in the browser and are never persisted by the server. The optional breach check uses k-anonymity: the browser sends only a short hash prefix to the upstream range API.
 
-**Proprietary software.** All rights reserved.
+## Features
 
-## Prerequisites
+- Client-side password strength scoring and entropy analysis
+- Character-set, sequence, dictionary-shape, and policy analysis
+- Offline breach-hash lookup
+- Have I Been Pwned range-query proxy that accepts only 5-character SHA-1 prefixes
+- Modular production service layer for scoring, risk, audit, reporting, compliance, operations, and security workflows
+- Service registry and health endpoints
+- Structured logging and error handling
+- Jest tests with coverage
+- Docker packaging
+- No database and no password persistence
 
-- Node.js 18 or later
-- npm 9 or later
+## Requirements
 
-## Installation
+- Node.js 18+
+- npm 9+
+
+## Install
 
 ```bash
 npm install
@@ -22,70 +32,57 @@ npm install
 npm start
 ```
 
-Then open http://localhost:3000 in your browser.
+Open `http://localhost:3000`.
 
-Development (same as start for this project):
+## Development
 
 ```bash
 npm run dev
-```
-
-## Tests
-
-```bash
 npm test
+npm run validate
+npm run smoke
 ```
 
-Coverage report is written to `coverage/`.
+## API
+
+- `GET /api/health` — application health
+- `GET /api/services` — registered production service catalog
+- `GET /api/services/:name/health` — service health
+- `POST /api/services/:name/validate` — validate a JSON object against a service's generic contract
+- `GET /api/hibp/range/:prefix` — privacy-preserving 5-character hash-prefix proxy
+
+## Security and privacy
+
+The server deliberately does not accept passwords for analysis or store password material. Do not add password fields to server-side persistence. HIBP requests must remain prefix-only. Environment files and secrets are excluded from version control.
 
 ## Project structure
 
-```
+```text
 vaultcheck/
+├── public/                  # browser application
 ├── server/
-│   └── index.js          # Express static server + HIBP proxy
-├── public/
-│   ├── index.html
-│   ├── app.js            # Strength scoring + offline/online breach checks
-│   ├── styles.css
-│   └── data/
-│       └── offline-breach-hashes.txt
-├── tests/
-│   └── strength.test.js
+│   ├── api/                 # HTTP API adapters
+│   ├── lib/                 # small infrastructure helpers
+│   ├── modules/             # production security/domain services
+│   ├── service-registry.js  # service catalog and factory
+│   └── index.js             # Express entry point
+├── tests/                   # automated tests
+├── Dockerfile
 ├── package.json
 ├── package-lock.json
 └── README.md
 ```
 
-## Dependencies
+## Build
 
-- **express** – lightweight static file server and thin HIBP range proxy
-- **jest** (dev) – unit tests and coverage
-
-## Usage
-
-1. Type or paste a password into the input field.
-2. Strength score, estimated crack time, policy findings and entropy update live.
-3. Offline breach check runs against the bundled hash list (no network).
-4. Optional online HaveIBeenPwned k-anonymity lookup uses only a 5-character SHA-1 prefix.
-
-## License
-
-Proprietary. Not open source. Do not distribute without permission.
-
-## Changelog
-- Initial release of VaultCheck password analyzer
-
-## Docker
+There is no bundling step. The application is a static browser client plus a Node.js/Express server. The deployment artifact is created with Docker or by packaging the repository.
 
 ```bash
+npm run build
 docker build -t vaultcheck .
-docker run -p 3000:3000 vaultcheck
+docker run --rm -p 3000:3000 vaultcheck
 ```
 
-Or use the npm helpers:
+## Ownership
 
-```bash
-npm run docker:build
-npm run docker:run
-```
+VaultCheck is proprietary software. No open-source license is granted by this repository. Third-party dependencies retain their own licenses.

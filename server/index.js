@@ -8,6 +8,7 @@ const express = require('express');
 const path = require('path');
 const { fetchRange } = require('./lib/hibp-proxy');
 const log = require('./lib/logger');
+const serviceApi = require('./api/services');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -21,6 +22,7 @@ app.use('/data/offline-breach-hashes.txt', express.static(
 ));
 
 app.use(express.static(path.join(__dirname, '..', 'public'), { extensions: ['html'] }));
+app.use('/api', serviceApi);
 
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, service: 'vaultcheck', mode: 'static-only, no database' });
