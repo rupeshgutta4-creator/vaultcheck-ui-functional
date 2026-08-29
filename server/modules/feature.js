@@ -447,6 +447,95 @@ class FeatureService {
         return { title: 'feature', purpose: 'feature production service operations', healthy: health.healthy, recordCount: health.records, version: health.version };
   }
 
+  registerFeature(name, value, timestamp = new Date().toISOString(), metadata = {}) {
+    if (!name || typeof name !== 'string') throw new Error('Feature name must be a non-empty string');
+    const isoTime = new Date(timestamp).toISOString();
+    const entry = {
+      id: `feature-${name}-${new Date(isoTime).getTime()}-${stableKey(metadata).slice(0, 6)}`,
+      name: name.trim(),
+      value,
+      timestamp: isoTime,
+      metadata: { ...metadata }
+    };
+    return this.create(entry);
+  }
+
+  getTimeline(name) {
+    if (!name) return [];
+    return Array.from(this.records.values())
+      .filter(r => r.name === name.trim())
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  }
+
+  asOfJoin(targetTimestamp, featureNames = [], options = {}) {
+    const targetMs = new Date(targetTimestamp).getTime();
+    if (Number.isNaN(targetMs)) throw new Error('Invalid target timestamp');
+
+    const requested = Array.isArray(featureNames) && featureNames.length
+      ? featureNames.map(f => f.trim())
+      : Array.from(new Set(Array.from(this.records.values()).map(r => r.name)));
+
+    const result = {
+      asOf: new Date(targetMs).toISOString(),
+      features: {},
+      missing: []
+    };
+
+    for (const name of requested) {
+      const timeline = this.getTimeline(name);
+      // Find latest entry with timestamp <= targetMs
+      let match = null;
+      for (let i = timeline.length - 1; i >= 0; i--) {
+        if (new Date(timeline[i].timestamp).getTime() <= targetMs) {
+          match = timeline[i];
+          break;
+        }
+      }
+
+      if (match) {
+        result.features[name] = {
+          value: match.value,
+          effectiveTimestamp: match.timestamp,
+          stalenessMs: targetMs - new Date(match.timestamp).getTime()
+        };
+      } else {
+        result.missing.push(name);
+        if (options.defaultValues && options.defaultValues[name] !== undefined) {
+          result.features[name] = {
+            value: options.defaultValues[name],
+            effectiveTimestamp: null,
+            stalenessMs: null,
+            fallback: true
+          };
+        }
+      }
+    }
+
+    return result;
+  }
+
+  diffAsOf(timestampA, timestampB, featureNames = []) {
+    const stateA = this.asOfJoin(timestampA, featureNames);
+    const stateB = this.asOfJoin(timestampB, featureNames);
+    const allKeys = Array.from(new Set([...Object.keys(stateA.features), ...Object.keys(stateB.features)]));
+
+    const changes = {};
+    for (const key of allKeys) {
+      const valA = stateA.features[key] ? stateA.features[key].value : undefined;
+      const valB = stateB.features[key] ? stateB.features[key].value : undefined;
+      if (JSON.stringify(valA) !== JSON.stringify(valB)) {
+        changes[key] = { from: valA, to: valB };
+      }
+    }
+
+    return {
+      timestampA: stateA.asOf,
+      timestampB: stateB.asOf,
+      changes,
+      changedCount: Object.keys(changes).length
+    };
+  }
+
 }
 
 module.exports = { FeatureService,
