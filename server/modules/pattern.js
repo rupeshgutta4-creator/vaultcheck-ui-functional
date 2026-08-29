@@ -447,6 +447,86 @@ class PatternService {
         return { title: 'pattern', purpose: 'pattern production service operations', healthy: health.healthy, recordCount: health.records, version: health.version };
   }
 
+  detectRingPatterns(inputString, minLength = 4) {
+    if (!inputString || typeof inputString !== 'string') {
+      return { detected: false, rings: [], riskPenalty: 0 };
+    }
+    const str = inputString.toLowerCase();
+    const ringsFound = [];
+
+    // Predefined spatial rings on standard QWERTY keyboards and numpads
+    const SPATIAL_RINGS = [
+      { name: 'numpad-perimeter-cw', path: '1478963214789632' },
+      { name: 'numpad-perimeter-ccw', path: '1236987412369874' },
+      { name: 'numpad-upper-ring', path: '47854785' },
+      { name: 'numpad-lower-ring', path: '12541254' },
+      { name: 'qwerty-ring-qwerfdsa', path: 'qwerfdsaqwerfdsa' },
+      { name: 'qwerty-ring-asdfvcxz', path: 'asdfvcxzasdfvcxz' },
+      { name: 'qwerty-box-qwas', path: 'qwasqwas' },
+      { name: 'qwerty-box-wertfd', path: 'wertfdwertfd' },
+      { name: 'cyclic-alpha-forward', path: 'abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz' },
+      { name: 'cyclic-alpha-reverse', path: 'zyxwvutsrqponmlkjihgfedcbazyxwvutsrqponmlkjihgba' }
+    ];
+
+    for (const ring of SPATIAL_RINGS) {
+      for (let len = Math.min(str.length, 12); len >= minLength; len--) {
+        for (let i = 0; i <= str.length - len; i++) {
+          const slice = str.slice(i, i + len);
+          if (ring.path.includes(slice)) {
+            const exists = ringsFound.some(r => r.matched.includes(slice));
+            if (!exists) {
+              ringsFound.push({
+                ringType: ring.name,
+                matched: slice,
+                length: len,
+                position: i
+              });
+            }
+          }
+        }
+      }
+    }
+
+    const riskPenalty = ringsFound.reduce((acc, r) => acc + (r.length * 5), 0);
+    return {
+      detected: ringsFound.length > 0,
+      rings: ringsFound,
+      riskPenalty: clamp(riskPenalty, 0, 80)
+    };
+  }
+
+  analyzeTopology(inputString) {
+    if (!inputString || typeof inputString !== 'string' || inputString.length < 2) {
+      return { nodes: 0, edges: 0, hasCycles: false, cyclomaticScore: 0 };
+    }
+    const nodes = new Set(inputString.split(''));
+    const edges = new Map();
+    let cycles = 0;
+
+    for (let i = 0; i < inputString.length - 1; i++) {
+      const u = inputString[i];
+      const v = inputString[i + 1];
+      const edgeKey = `${u}->${v}`;
+      const revKey = `${v}->${u}`;
+      if (edges.has(revKey)) {
+        cycles++;
+      }
+      edges.set(edgeKey, (edges.get(edgeKey) || 0) + 1);
+    }
+
+    const numNodes = nodes.size;
+    const numEdges = edges.size;
+    // Cyclomatic complexity approximation: E - V + 2P (P=1)
+    const cyclomaticScore = Math.max(0, numEdges - numNodes + 2);
+
+    return {
+      nodes: numNodes,
+      edges: numEdges,
+      hasCycles: cycles > 0 || cyclomaticScore > 1,
+      cyclomaticScore
+    };
+  }
+
 }
 
 module.exports = { PatternService,
