@@ -8,7 +8,10 @@
     "start": "node server/index.js",
     "dev": "node server/index.js",
     "test": "jest --coverage",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "build": "echo \"No build step required — static + Node server\"",
+    "docker:build": "docker build -t vaultcheck .",
+    "docker:run": "docker run -p 3000:3000 vaultcheck"
   },
   "engines": {
     "node": ">=18.0.0"
